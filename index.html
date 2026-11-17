@@ -97,6 +97,11 @@
   /* clicar no número da página: escrever a página para onde ir */
   #count span.go { cursor: text; padding: 4px 6px; transition: color .1s; }
   #count span.go:hover { color: var(--ink); }
+  #count .gobtn {
+    margin-left: 6px; padding: 2px 8px; font: inherit; letter-spacing: inherit; cursor: pointer;
+    background: var(--ink); color: var(--background); border: 1px solid var(--ink);
+  }
+  @media (pointer: coarse) { #count .gobtn { padding: 8px 14px; } #count input { font-size: 16px; } }
   #count input {
     width: 5ch; padding: 0 0 1px; margin: 0; text-align: center;
     font: inherit; letter-spacing: inherit; color: var(--ink);
@@ -181,6 +186,7 @@
 </div>
 
 <div id="tools" hidden>
+  <button id="btnClose" class="tool label" hidden title="Close the book (back to the cover)">Close</button>
   <button id="pubsBtn" class="tool label" hidden aria-haspopup="true" aria-expanded="false">Publications</button>
   <div id="pubs" class="label" hidden role="menu"></div>
   <button id="btn3d" class="tool label" hidden aria-pressed="false" title="3D mockup">3D</button>
@@ -732,6 +738,7 @@ $("viewer").addEventListener("auxclick", e => { if (e.button === 1) e.preventDef
 
 function update(target) {
   if (!flip) return;
+  if (typeof toolsState === "function" && $("tools") && !$("tools").hidden) setTimeout(toolsState, 0);
   const i = typeof target === "number" ? target : flip.getCurrentPageIndex();
   const n = book.images.length;
   const spread = flip.getOrientation() === "landscape";
@@ -776,7 +783,8 @@ async function go(dir) {
 $("count").addEventListener("click", e => {
   if (!flip || busy || !e.target.closest(".go")) return;
   const c = $("count"), n = book.images.length, i = flip.getCurrentPageIndex();
-  c.innerHTML = `<input type="text" inputmode="numeric" autocomplete="off" aria-label="Go to page" value="${i + 1}"> / ${n}`;
+  c.innerHTML = `<input type="text" inputmode="numeric" enterkeyhint="go" autocomplete="off" aria-label="Go to page" value="${i + 1}"> / ${n}` +
+    ` <button type="button" class="gobtn" aria-label="Go to page">→</button>`;
   const inp = c.querySelector("input");
   inp.focus(); inp.select();
   const done = goTo => {
@@ -792,7 +800,9 @@ $("count").addEventListener("click", e => {
     if (ev.key === "Escape") { ev.preventDefault(); done(false); }
   });
   inp.addEventListener("input", () => { inp.value = inp.value.replace(/[^0-9]/g, "").slice(0, 4); });
-  inp.addEventListener("blur", () => done(false));
+  // o teclado numérico do iPhone não tem Enter: sair do campo ("OK"/"Concluído") também confirma
+  inp.addEventListener("blur", () => done(true));
+  c.querySelector(".gobtn").addEventListener("pointerdown", ev => { ev.preventDefault(); done(true); });
 });
 function goToPage(idx) {
   if (!flip || flip.getState() !== "read") return;
@@ -1795,6 +1805,9 @@ function setupTools() {
 }
 function toolsState() {
   const in3D = !!mock;
+  // Close: só com o livro aberto (no flipbook, fora da capa)
+  $("btnClose").hidden = in3D || !flip || flip.getCurrentPageIndex() === 0;
+  $("btnClose").disabled = busy;
   $("btn3d").classList.toggle("on", in3D);
   $("btn3d").setAttribute("aria-pressed", in3D);
   $("btn3d").disabled = $("pubsBtn").disabled = busy;
@@ -1814,6 +1827,7 @@ function pubsMenu(open) {
 $("pubsBtn").onclick = e => { e.stopPropagation(); if (!busy) pubsMenu($("pubs").hidden); };
 addEventListener("pointerdown", e => { if (!$("pubs").hidden && !e.target.closest("#tools")) pubsMenu(false); }, true);
 $("btn3d").onclick = () => { if (busy) return; mock ? openFrom3D() : closeTo3D(); };
+$("btnClose").onclick = () => { if (busy || !flip) return; resetZoom(false); goToPage(0); };
 
 // mudar de publicação: no flipbook abre-a na capa; no 3D troca o objeto na mesa
 async function switchDoc(i) {
