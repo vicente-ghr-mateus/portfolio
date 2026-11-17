@@ -54,7 +54,7 @@
   #viewer { touch-action: none; -webkit-tap-highlight-color: transparent; }
   /* telemóvel/tablet: alvos de toque com 44 px (recomendação da Apple) */
   @media (pointer: coarse) {
-    #tools #dl { width: 44px; height: 44px; padding: 12px; }
+    #tools #dl, #btnClose { width: 44px; height: 44px; padding: 12px; }
     #viewer .nav { width: 44px; height: 44px; }
   }
   #zoom.anim { transition: transform .45s cubic-bezier(.3, 0, .2, 1); }
@@ -159,13 +159,22 @@
   #pubs button[aria-current="true"] { color: var(--ink); }
   #pubs button span:first-child { width: 2ch; flex: none; }
   @media (pointer: coarse) { .tool { height: 44px; padding: 0 12px; } }
-  #dl {
+  #dl, #btnClose {
     width: 32px; height: 32px; padding: 6px; background: none; border: 0; cursor: pointer;
     color: var(--muted); transition: color .1s, opacity .1s;
   }
-  #dl svg { display: block; width: 100%; height: 100%; }
-  #dl:hover { color: var(--ink); }
-  #dl:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+  #btnClose { position: fixed; top: 16px; left: 16px; z-index: 5; }
+  #dl svg, #btnClose svg { display: block; width: 100%; height: 100%; }
+  #dl:hover, #btnClose:hover { color: var(--ink); }
+  #dl:focus-visible, #btnClose:focus-visible { outline: 1px solid var(--ink); outline-offset: 2px; }
+  #btnClose:disabled { opacity: .35; cursor: default; }
+  /* ecrãs baixos (telemóvel deitado): barra em coluna à direita, X à esquerda, setas a meio dos
+     lados, número ao lado das páginas — nada por cima do livro */
+  body.short #tools { top: 10px; right: 12px; flex-direction: column; align-items: flex-end; gap: 2px; }
+  body.short #btnClose { top: 10px; left: 12px; }
+  body.short #viewer .nav { top: 50%; bottom: auto; transform: translateY(-50%); }
+  body.short #prev { left: 12px; } body.short #next { right: 12px; }
+  body.short #pubs { top: 0; right: calc(100% + 6px); }
   #dl[aria-busy="true"] { opacity: .35; cursor: progress; }
 
 </style>
@@ -185,8 +194,12 @@
   <button class="nav" id="next" aria-label="Next page">→</button>
 </div>
 
+<button id="btnClose" hidden title="Close the book (back to the cover)" aria-label="Close the book">
+  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square" aria-hidden="true">
+    <path d="M4.5 4.5l11 11"/><path d="M15.5 4.5l-11 11"/>
+  </svg>
+</button>
 <div id="tools" hidden>
-  <button id="btnClose" class="tool label" hidden title="Close the book (back to the cover)">Close</button>
   <button id="pubsBtn" class="tool label" hidden aria-haspopup="true" aria-expanded="false">Publications</button>
   <div id="pubs" class="label" hidden role="menu"></div>
   <button id="btn3d" class="tool label" hidden aria-pressed="false" title="3D mockup">3D</button>
@@ -432,10 +445,14 @@ function build(start) {
   // sempre spreads (também no telemóvel de pé), tão grandes quanto o ecrã deixa, com uma margem
   const single = n === 1;
   const narrow = innerWidth < 700;
-  const availW = innerWidth - (narrow ? 2 * 12 : 2 * 96);   // telemóvel: 12 px de margem; senão, espaço para as setas
-  // ecrãs baixos (telemóvel deitado): margens verticais mais pequenas, para as páginas crescerem
+  // ecrãs baixos (telemóvel deitado): as páginas usam a altura toda; os lados ficam para a barra
+  // (em coluna), as setas e o número da página — nada se sobrepõe ao livro
   const short = innerHeight < 520;
-  const availH = innerHeight - 2 * (short ? 30 : 64);    // espaço para o contador
+  document.body.classList.toggle("short", short);
+  const toolsW = $("tools").hidden ? 0 : $("tools").offsetWidth;
+  const gutter = short ? Math.max(68, toolsW + 22) : narrow ? 12 : 96;
+  const availW = innerWidth - 2 * gutter;   // telemóvel de pé: 12 px de margem; senão, espaço para as setas
+  const availH = innerHeight - 2 * (short ? 12 : 64);    // espaço para o contador
 
   let h = availH, w = h / book.ratio;
   if ((single ? w : w * 2) > availW) { w = single ? availW : availW / 2; h = w * book.ratio; }
@@ -474,7 +491,14 @@ function build(start) {
   // contador no mesmo sítio de sempre (20 px acima do fundo do ecrã), mas preso às páginas
   update();
   const c = $("count");
-  c.style.top = (innerHeight - (short ? 8 : 20) - (c.offsetHeight || 13) - (innerHeight - Math.floor(h)) / 2) + "px";
+  if (short) {
+    // ao lado do spread, à direita, alinhado com o fundo das páginas
+    c.style.left = "calc(100% + 14px)"; c.style.right = "auto"; c.style.textAlign = "left";
+    c.style.top = (Math.floor(h) - (c.offsetHeight || 13)) + "px";
+  } else {
+    c.style.left = c.style.right = c.style.textAlign = "";
+    c.style.top = (innerHeight - 20 - (c.offsetHeight || 13) - (innerHeight - Math.floor(h)) / 2) + "px";
+  }
 }
 
 // sombra da folha a virar: a original (escuro → claro → escuro) parece um reflexo de papel
