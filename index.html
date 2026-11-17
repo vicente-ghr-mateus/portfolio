@@ -158,12 +158,6 @@
   #pubs button[aria-current="true"] { color: var(--ink); }
   #pubs button span:first-child { width: 2ch; flex: none; }
   @media (pointer: coarse) { .tool { height: 44px; padding: 0 12px; } }
-  /* puxar para recarregar (telemóvel) */
-  #pull {
-    position: fixed; top: 14px; left: 0; right: 0; text-align: center; z-index: 4; pointer-events: none;
-    opacity: 0; transition: opacity .15s;
-  }
-  #pull.ready { color: var(--ink); }
   #dl, #btnClose {
     width: 32px; height: 32px; padding: 6px; background: none; border: 0; cursor: pointer;
     color: var(--muted); transition: color .1s, opacity .1s;
@@ -204,7 +198,6 @@
     <path d="M4.5 4.5l11 11"/><path d="M15.5 4.5l-11 11"/>
   </svg>
 </button>
-<div id="pull" class="label" aria-hidden="true">Pull to refresh</div>
 <div id="tools" hidden>
   <button id="pubsBtn" class="tool label" hidden aria-haspopup="true" aria-expanded="false">Publications</button>
   <div id="pubs" class="label" hidden role="menu"></div>
@@ -726,28 +719,20 @@ $("viewer").addEventListener("touchmove", e => {
     }
   }
 }, { capture: true, passive: false });
-// o livro desce com o dedo (com resistência); passado o limite, largar recarrega a página
-const PULL_AT = 70;
+// puxar para baixo: o livro (e a interface) desaparece para a cor do fundo à medida que se puxa;
+// passado o limite, largar recarrega a página; antes disso, volta ao normal
+const PULL_AT = 150;   // px de dedo até ao fundo liso
+const pullEls = () => [$("viewer"), $("tools"), $("btnClose")];
 function pullTo(dy) {
-  const d = Math.max(0, Math.min(120, dy * 0.45));
-  const v = $("viewer"), p = $("pull");
-  v.style.transition = "none";
-  v.style.transform = d ? `translateY(${d}px)` : "";
-  p.style.opacity = Math.min(1, d / PULL_AT);
-  p.classList.toggle("ready", d >= PULL_AT);
-  p.textContent = d >= PULL_AT ? "Release to refresh" : "Pull to refresh";
-  touch.pull = d;
+  const k = Math.max(0, Math.min(1, dy / PULL_AT));
+  for (const el of pullEls()) { el.style.transition = "none"; el.style.opacity = 1 - k; }
+  touch.pull = k;
 }
 function pullEnd() {
-  const v = $("viewer"), p = $("pull");
-  if (touch.pull >= PULL_AT) {
-    p.textContent = "Refreshing";
-    location.reload();
-    return;
-  }
-  v.style.transition = "transform .25s ease"; v.style.transform = "";
-  p.style.opacity = 0;
+  const done = touch.pull >= 1;
+  for (const el of pullEls()) { el.style.transition = "opacity .25s ease"; el.style.opacity = done ? 0 : ""; }
   touch.pull = 0;
+  if (done) setTimeout(() => location.reload(), 120);
 }
 $("viewer").addEventListener("touchend", e => {
   const t = e.touches, c = e.changedTouches[0];
