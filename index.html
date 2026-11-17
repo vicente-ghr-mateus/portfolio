@@ -719,20 +719,28 @@ $("viewer").addEventListener("touchmove", e => {
     }
   }
 }, { capture: true, passive: false });
-// puxar para baixo: o livro (e a interface) desaparece para a cor do fundo à medida que se puxa;
-// passado o limite, largar recarrega a página; antes disso, volta ao normal
-const PULL_AT = 150;   // px de dedo até ao fundo liso
+// puxar para baixo: tudo (livro e interface) desce com o dedo, com resistência, e vai até 50%
+// de opacidade; passado o limite, largar recarrega a página; antes disso, volta ao sítio
+const PULL_AT = 150;   // px de dedo até ao limite
 const pullEls = () => [$("viewer"), $("tools"), $("btnClose")];
 function pullTo(dy) {
   const k = Math.max(0, Math.min(1, dy / PULL_AT));
-  for (const el of pullEls()) { el.style.transition = "none"; el.style.opacity = 1 - k; }
+  const y = Math.max(0, dy) * 0.5 / (1 + Math.max(0, dy) / 400);   // desce com resistência
+  for (const el of pullEls()) {
+    el.style.transition = "none";
+    el.style.opacity = 1 - 0.5 * k;
+    el.style.translate = `0 ${y}px`;
+  }
   touch.pull = k;
 }
 function pullEnd() {
   const done = touch.pull >= 1;
-  for (const el of pullEls()) { el.style.transition = "opacity .25s ease"; el.style.opacity = done ? 0 : ""; }
   touch.pull = 0;
-  if (done) setTimeout(() => location.reload(), 120);
+  if (done) { setTimeout(() => location.reload(), 60); return; }
+  for (const el of pullEls()) {
+    el.style.transition = "opacity .25s ease, translate .25s ease";
+    el.style.opacity = ""; el.style.translate = "";
+  }
 }
 $("viewer").addEventListener("touchend", e => {
   const t = e.touches, c = e.changedTouches[0];
